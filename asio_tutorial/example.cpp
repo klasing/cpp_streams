@@ -2,12 +2,18 @@
 //
 
 #include "pch.h"
+// error C4996: 'ctime': This function or variable may be unsafe.
+// Consider using ctime_s instead.
+#define _CRT_SECURE_NO_WARNINGS
 #define _WIN32_WINNT 0x0501
-#include <iostream>
 #include <boost/asio.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/bind.hpp>
+#include <boost/thread.hpp>
+#include <boost/array.hpp>
+#include <iostream>
+#include <string>
 
 //****************************************************************************
 //*                     print
@@ -71,10 +77,79 @@ public:
 	}
 };
 //****************************************************************************
+//*                     printer_with_two_thread
+//****************************************************************************
+class printer_with_two_thread
+{
+	boost::asio::io_service::strand strand_;
+	boost::asio::deadline_timer timer1_;
+	boost::asio::deadline_timer timer2_;
+	int count_;
+public:
+	printer_with_two_thread(boost::asio::io_service& io)
+		: strand_(io)
+		, timer1_(io, boost::posix_time::seconds(1))
+		, timer2_(io, boost::posix_time::seconds(1))
+		, count_(0)
+	{
+		timer1_.async_wait(strand_.wrap(boost::bind(
+			&printer_with_two_thread::print1
+			, this)));
+		timer2_.async_wait(strand_.wrap(boost::bind(
+			&printer_with_two_thread::print2
+			, this)));
+	}
+	~printer_with_two_thread()
+	{
+		std::cout << "Final count is " << count_ << std::endl;
+	}
+	void print1()
+	{
+		if (count_ < 10)
+		{
+			std::cout << "Timer 1: " << count_ << std::endl;
+			++count_;
+			timer1_.expires_at(timer1_.expires_at() + boost::posix_time::seconds(1));
+			// smells like recursion
+			timer1_.async_wait(strand_.wrap(boost::bind(
+				&printer_with_two_thread::print1
+				, this)));
+		}
+	}
+	void print2()
+	{
+		if (count_ < 10)
+		{
+			std::cout << "Timer 2: " << count_ << std::endl;
+			++count_;
+			timer2_.expires_at(timer2_.expires_at() + boost::posix_time::seconds(1));
+			// smells like recursion
+			timer2_.async_wait(strand_.wrap(boost::bind(
+				&printer_with_two_thread::print2
+				, this)));
+		}
+	}
+};
+//****************************************************************************
+//*                     make_daytime_string
+//****************************************************************************
+std::string make_daytime_string()
+{
+	// for time_t, time and ctime
+	using namespace std;
+	time_t now = time(0);
+	return ctime(&now);
+}
+//****************************************************************************
 //*                     main
 //****************************************************************************
+using boost::asio::ip::tcp;
 int main()
 {
+	std::cout << "Boost version...: 1_69_0\n";
+	std::cout << "Platform........: MSVC 2017 15.9.16\n";
+	goto introduction_to_sockets;
+	std::cout << "Basic Skills\n";
 	{
 		std::cout << "TIMER.1 - Using a timer synchronously\n";
 		std::cout << "waiting for 5 seconds before outputting...\n";
@@ -120,6 +195,85 @@ int main()
 		printer p(io);
 		io.run();
 	}
+
+	{
+		std::cout << "TIMER.5 - Synchronising handlers in multithreaded programs\n";
+		boost::asio::io_service io;
+		printer_with_two_thread p(io);
+		// there is a typo in the example
+		// it says: asio::thread t( etc.
+		boost::thread t(boost::bind(&boost::asio::io_service::run, &io));
+		io.run();
+		t.join();
+	}
+// label
+introduction_to_sockets:
+	std::cout << "Introduction to Sockets\n";
+	{
+		std::cout << "Daytime.1 - A synchronous TCP daytime client\n";
+		try
+		{
+			//char host[] = "192.168.178.14";
+			// NIST, Gaithersburg, Maryland (port is 13)
+			char host[] = "129.6.15.28";
+			boost::asio::io_service io_service;
+			tcp::resolver resolver(io_service);
+			tcp::resolver::query query(host, "daytime");
+			tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+			tcp::socket socket(io_service);
+			boost::asio::connect(socket, endpoint_iterator);
+			for (;;)
+			{
+				boost::array<char, 128> buf;
+				boost::system::error_code error;
+				size_t len = socket.read_some(boost::asio::buffer(buf), error);
+				if (error == boost::asio::error::eof)
+					// connection closed cleanly by peer
+					break;
+				else if (error)
+					// some other error
+					throw boost::system::system_error(error);
+				std::cout.write(buf.data(), len);
+			}
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << e.what() << std::endl;
+		}
+	}
+
+	{
+		std::cout << "Daytime.2 - A synchronous TCP daytime server\n";
+		try
+		{
+			boost::asio::io_service io_service;
+			tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), 13));
+			for (;;)
+			{
+				tcp::socket socket(io_service);
+				acceptor.accept(socket);
+				std::string message = make_daytime_string();
+				boost::system::error_code ignored_error;
+				boost::asio::write(socket
+					, boost::asio::buffer(message)
+					, ignored_error
+				);
+			}
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << e.what() << std::endl;
+		}
+	}
+	// message received will be:
+	// Mon Oct 21 11:14 : 16 2019
+	//
+	// De verbinding met de host is verbroken.
+
+	{
+
+	}
+
 	return EXIT_SUCCESS;
 }
 
