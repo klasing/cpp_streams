@@ -6,15 +6,19 @@
 // Consider using ctime_s instead.
 #define _CRT_SECURE_NO_WARNINGS
 #define _WIN32_WINNT 0x0501
-#include <boost/asio.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/system/error_code.hpp>
-#include <boost/bind.hpp>
-#include <boost/thread.hpp>
 #include <boost/array.hpp>
+#include <boost/asio.hpp>
+#include <boost/bind.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/enable_shared_from_this.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/system/error_code.hpp>
+#include <boost/thread.hpp>
 #include <iostream>
 #include <string>
 
+using boost::asio::ip::tcp;
+using boost::asio::ip::udp;
 //****************************************************************************
 //*                     print
 //****************************************************************************
@@ -141,13 +145,86 @@ std::string make_daytime_string()
 	return ctime(&now);
 }
 //****************************************************************************
+//*                     tcp_connection
+//****************************************************************************
+class tcp_connection : public boost::enable_shared_from_this<tcp_connection>
+{
+	tcp::socket socket_;
+	std::string message_;
+public:
+	typedef boost::shared_ptr<tcp_connection> pointer;
+	static pointer create(boost::asio::io_service& io_service)
+	{
+		return pointer(new tcp_connection(io_service));
+	}
+	tcp::socket& socket()
+	{
+		return socket_;
+	}
+	void start()
+	{
+		std::cout << "start()\n";
+		message_ = make_daytime_string();
+		boost::asio::async_write(socket_
+			, boost::asio::buffer(message_)
+			, boost::bind(&tcp_connection::handle_write
+				, shared_from_this()
+				, boost::asio::placeholders::error
+				, boost::asio::placeholders::bytes_transferred
+			)
+		);
+	}
+private:
+	tcp_connection(boost::asio::io_service& io_service)
+		: socket_(io_service)
+	{}
+	void handle_write(const boost::system::error_code& /*error*/
+		, size_t /*bytes_transferred*/
+	)
+	{}
+};
+//****************************************************************************
+//*                     tcp_server
+//****************************************************************************
+class tcp_server
+{
+	tcp::acceptor acceptor_;
+public:
+	tcp_server(boost::asio::io_service& io_service)
+		: acceptor_(io_service, tcp::endpoint(tcp::v4(), 13))
+	{
+		std::cout << "accept()\n";
+		start_accept();
+	}
+private:
+	void start_accept()
+	{
+		tcp_connection::pointer new_connection =
+			tcp_connection::create(acceptor_.get_io_service());
+
+		acceptor_.async_accept(new_connection->socket()
+			, boost::bind(&tcp_server::handle_accept, this, new_connection
+				, boost::asio::placeholders::error)
+		);
+	}
+	void handle_accept(tcp_connection::pointer new_connection
+		, const boost::system::error_code& error
+	)
+	{
+		if (!error)
+			new_connection->start();
+		std::cout << "accept()\n";
+		start_accept();
+	}
+};
+//****************************************************************************
 //*                     main
 //****************************************************************************
-using boost::asio::ip::tcp;
 int main()
 {
 	std::cout << "Boost version...: 1_69_0\n";
 	std::cout << "Platform........: MSVC 2017 15.9.16\n";
+	std::cout << "Compiler........: C++03\n";
 	goto introduction_to_sockets;
 	std::cout << "Basic Skills\n";
 	{
@@ -215,6 +292,8 @@ introduction_to_sockets:
 		{
 			//char host[] = "192.168.178.14";
 			// NIST, Gaithersburg, Maryland (port is 13)
+			// e.g. output is:
+			// 58777 19-10-21 14:54:50 14 0 0 654.1 UTC(NIST) *
 			char host[] = "129.6.15.28";
 			boost::asio::io_service io_service;
 			tcp::resolver resolver(io_service);
@@ -242,6 +321,7 @@ introduction_to_sockets:
 		}
 	}
 
+	goto goto_daytime_4;
 	{
 		std::cout << "Daytime.2 - A synchronous TCP daytime server\n";
 		try
@@ -270,8 +350,49 @@ introduction_to_sockets:
 	//
 	// De verbinding met de host is verbroken.
 
+goto_daytime_3:
 	{
+		std::cout << "Daytime.3 - An asynchronous TCP daytime server\n";
+		try
+		{
+			boost::asio::io_service io_service;
+			tcp_server server(io_service);
+			io_service.run();
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << e.what() << std::endl;
+		}
+	}
 
+goto_daytime_4:
+	{
+		std::cout << "Daytime.4 - A synchronous UDP daytime client\n";
+		try
+		{
+			char host[] = "192.168.178.14";
+			// daytime servers on the internet serve only with TCP
+			boost::asio::io_service io_service;
+			udp::resolver resolver(io_service);
+			udp::resolver::query query(udp::v4(), host, "daytime");
+			udp::endpoint receiver_endpoint = *resolver.resolve(query);
+			udp::socket socket(io_service);
+			socket.open(udp::v4());
+			boost::array<char, 1> send_buf = { {0} };
+			socket.send_to(boost::asio::buffer(send_buf)
+				, receiver_endpoint
+			);
+			boost::array<char, 128> recv_buf;
+			udp::endpoint sender_endpoint;
+			size_t len = socket.receive_from(boost::asio::buffer(recv_buf)
+				, sender_endpoint
+			);
+			std::cout.write(recv_buf.data(), len);
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << e.what() << std::endl;
+		}
 	}
 
 	return EXIT_SUCCESS;
