@@ -90,6 +90,10 @@ int main()
 	std::cout << "enter a string (without spaces!) ";
 	is >> s;
 	std::cout << "s contains: " << s.c_str() << std::endl;
+	int i;
+	std::cout << "enter a integer number ";
+	is >> i;
+	std::cout << "i contains: " << i << std::endl;
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
