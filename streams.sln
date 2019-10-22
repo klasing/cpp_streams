@@ -1,9 +1,9 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.852
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ostream", "ostream\ostream.vcxproj", "{95D3B98E-039F-479F-944E-F51C741A4C76}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "streams", "streams\streams.vcxproj", "{95D3B98E-039F-479F-944E-F51C741A4C76}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "asio_tutorial", "asio_tutorial\asio_tutorial.vcxproj", "{66A958FB-1A6F-4573-AAE4-537EE5926032}"
 EndProject
