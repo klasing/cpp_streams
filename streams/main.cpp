@@ -28,14 +28,6 @@ protected:
 	}
 };
 
-//	static const unsigned BUFFER_MAX = 128;
-//	char buffer[BUFFER_MAX] = { 't', 'h', 'i', 's', ' ',
-//		's', 't', 'r', 'i', 'n', 'g', ' ', 'c', 'o', 'm', 'e', 's', ' ',
-//		'f', 'r', 'o', 'm', ' ', 't', 'h', 'e', ' ',
-//		'i', 'n', 'p', 'u', 't', ' ', 'b', 'u', 'f', 'f', 'e', 'r',
-//		'\0'};
-//	unsigned i = 0;
-
 //****************************************************************************
 //*                     input_buffer
 //****************************************************************************
@@ -95,7 +87,7 @@ int main()
 	is >> c;
 	std::cout << "c contains: " << c << std::endl;
 	std::string s;
-	std::cout << "enter a string ";
+	std::cout << "enter a string (without spaces!) ";
 	is >> s;
 	std::cout << "s contains: " << s.c_str() << std::endl;
 }
