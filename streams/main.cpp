@@ -29,6 +29,20 @@ protected:
 };
 
 //****************************************************************************
+//*                     output_stream
+//****************************************************************************
+class output_stream : public std::ostream
+{
+	output_buffer ob;
+public:
+	output_stream() : std::ostream(&ob) {}
+	char* get_buffer()
+	{
+		return ob.get_buffer();
+	}
+};
+
+//****************************************************************************
 //*                     input_buffer
 //****************************************************************************
 class input_buffer : public std::streambuf
@@ -69,14 +83,12 @@ public:
 int main()
 {
     std::cout << "Hello World!\n";
-	// create an output buffer
-	output_buffer ob;
-	// initialize an output stream with the output buffer
-	std::ostream output_stream(&ob);
+	// create an output stream
+	output_stream os;
 	// now everything send to the output_stream goes into the
 	// output_buffer
-	output_stream << "this string will end up in the output buffer" << std::endl;
-	std::cout << "the output buffer now holds: " << ob.get_buffer() << std::endl;
+	os << "this string will end up in the output buffer" << std::endl;
+	std::cout << "the output buffer now holds: " << os.get_buffer() << std::endl;
 
 	// check out:
 	// http://www.cplusplus.com/forum/general/94912/
