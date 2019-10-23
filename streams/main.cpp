@@ -34,11 +34,11 @@ protected:
 class input_buffer : public std::streambuf
 {
 	std::streambuf* source;
-	char ch;
+	char buffer;
 public:
 	input_buffer() : source(std::cin.rdbuf())
 	{
-		setg(&ch, &ch + 1, &ch + 1);
+		setg(&buffer, &buffer + 1, &buffer + 1);
 	}
 protected:
 	int underflow()
@@ -46,8 +46,8 @@ protected:
 		int n = source->sbumpc();
 		if (n != EOF)
 		{
-			ch = n;
-			setg(&ch, &ch, &ch + 1);
+			buffer = n;
+			setg(&buffer, &buffer, &buffer + 1);
 		}
 		return n;
 	}
